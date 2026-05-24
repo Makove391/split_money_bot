@@ -37,6 +37,7 @@ type Tr = {
 	historyPage: (current: number, total: number) => string;
 	historyPrevBtn: string;
 	historyNextBtn: string;
+	splitAlreadyActive: string;
 	help: string;
 	start: string;
 };
@@ -81,6 +82,7 @@ const en: Tr = {
 		"/finalize — calculate and show who pays whom",
 		"/history — browse past splits",
 	].join("\n"),
+	splitAlreadyActive: "A split is already active. Finalize it first with /finalize.",
 	start: "Add me to a group and use /newsplit to start splitting expenses.",
 };
 
@@ -124,6 +126,7 @@ const uk: Tr = {
 		"/finalize — підрахувати та показати хто кому платить",
 		"/history — переглянути минулі розподіли",
 	].join("\n"),
+	splitAlreadyActive: "Вже є активний розподіл. Спочатку завершіть його командою /finalize.",
 	start: "Додай мене до групи і використовуй /newsplit щоб почати ділити витрати.",
 };
 
@@ -167,6 +170,7 @@ const pl: Tr = {
 		"/finalize — oblicz i pokaż kto komu płaci",
 		"/history — przeglądaj poprzednie podziały",
 	].join("\n"),
+	splitAlreadyActive: "Podział jest już aktywny. Zakończ go najpierw za pomocą /finalize.",
 	start: "Dodaj mnie do grupy i użyj /newsplit, aby zacząć dzielić wydatki.",
 };
 

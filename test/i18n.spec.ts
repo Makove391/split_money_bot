@@ -53,4 +53,16 @@ describe("t", () => {
 		const tr = t("en");
 		expect(tr.defaultTitle(15, tr.months[0], 1)).toBe("Split 15 Jan #1");
 	});
+
+	it("splitAlreadyActive is defined in all languages", () => {
+		expect(t("en").splitAlreadyActive).toBeTruthy();
+		expect(t("uk").splitAlreadyActive).toBeTruthy();
+		expect(t("pl").splitAlreadyActive).toBeTruthy();
+	});
+
+	it("splitAlreadyActive mentions /finalize in all languages", () => {
+		expect(t("en").splitAlreadyActive).toContain("/finalize");
+		expect(t("uk").splitAlreadyActive).toContain("/finalize");
+		expect(t("pl").splitAlreadyActive).toContain("/finalize");
+	});
 });

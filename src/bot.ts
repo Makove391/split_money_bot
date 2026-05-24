@@ -35,7 +35,11 @@ export function createBot(env: Env): Bot {
 	bot.command("newsplit", async (ctx) => {
 		const groupId = String(ctx.chat.id);
 		const existing = await getActiveSplit(env.DB, groupId);
-		if (existing) return;
+		if (existing) {
+			const tr = t(resolveLang(ctx.from?.language_code));
+			await ctx.reply(tr.splitAlreadyActive);
+			return;
+		}
 
 		const lang = resolveLang(ctx.from?.language_code);
 		const tr = t(lang);
