@@ -163,6 +163,52 @@ Verify with `getWebhookInfo`.
 
 D1 migrations: `wrangler d1 migrations apply <DB_NAME>` (locally for dev DB, with `--remote` for production).
 
+## Registering the Bot (one-time setup)
+
+### 1. Create the bot with BotFather
+
+1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+2. Send `/newbot`, follow the prompts (name + username ending in `_bot`)
+3. Copy the `BOT_TOKEN` it gives you
+
+### 2. Set Cloudflare Worker secrets
+
+```powershell
+wrangler secret put BOT_TOKEN        # paste the token from BotFather
+wrangler secret put WEBHOOK_SECRET   # any random string, e.g.: openssl rand -hex 32
+```
+
+### 3. Get BOT_INFO and set it as a secret
+
+```powershell
+# Replace <TOKEN> with your actual bot token
+curl "https://api.telegram.org/bot<TOKEN>/getMe"
+# Copy the full JSON value of the "result" field, then:
+wrangler secret put BOT_INFO         # paste the JSON string
+```
+
+### 4. Deploy the worker
+
+```powershell
+npm run deploy
+```
+
+### 5. Register the webhook with Telegram
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://split-money-bot.makoveichukvitalii.workers.dev&secret_token=<WEBHOOK_SECRET>
+```
+
+Verify it worked:
+```
+https://api.telegram.org/bot<TOKEN>/getWebhookInfo
+```
+
+### Re-registration needed when
+
+- The Worker URL changes (custom domain, renamed worker)
+- `WEBHOOK_SECRET` is rotated
+
 ## What NOT to Do
 
 - Don't add Node-only dependencies. Check for `"node:"` imports or native modules before adding any package.
