@@ -12,20 +12,21 @@ import {
 	finalizeSplit,
 	calculateSettlement,
 } from "./db";
+import { resolveLang, t } from "./i18n";
+import type { Lang } from "./i18n";
 
 export function createBot(env: Env): Bot {
 	const bot = new Bot(env.BOT_TOKEN, {
 		botInfo: JSON.parse(env.BOT_INFO),
 	});
 
-	function splitKeyboard(splitId: number, joinCount: number): InlineKeyboard {
+	function splitKeyboard(splitId: number, joinCount: number, lang: Lang): InlineKeyboard {
+		const tr = t(lang);
 		return new InlineKeyboard()
-			.text(joinCount > 0 ? `Join (${joinCount})` : "Join", `join:${splitId}`)
-			.text("👥 Participants", `participants:${splitId}`)
-			.text("✅ Finalize", `finalize:${splitId}`);
+			.text(joinCount > 0 ? `${tr.joinBtn} (${joinCount})` : tr.joinBtn, `join:${splitId}`)
+			.text(tr.participantsBtn, `participants:${splitId}`)
+			.text(tr.finalizeBtn, `finalize:${splitId}`);
 	}
-
-	const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 	// /newsplit [title] — create a new split and post a Join button
 	bot.command("newsplit", async (ctx) => {
@@ -33,18 +34,20 @@ export function createBot(env: Env): Bot {
 		const existing = await getActiveSplit(env.DB, groupId);
 		if (existing) return;
 
+		const lang = resolveLang(ctx.from?.language_code);
+		const tr = t(lang);
 		const now = new Date();
 		const dateStr = now.toISOString().slice(0, 10);
 		const count = await countSplitsOnDate(env.DB, groupId, dateStr);
-		const defaultTitle = `Split ${now.getUTCDate()} ${MONTHS[now.getUTCMonth()]} #${count + 1}`;
+		const defaultTitle = tr.defaultTitle(now.getUTCDate(), tr.months[now.getUTCMonth()], count + 1);
 
 		const title = ctx.match.trim() || defaultTitle;
-		const splitId = await createSplit(env.DB, groupId, title);
+		const splitId = await createSplit(env.DB, groupId, title, lang);
 
-		await ctx.reply(
-			`*${title}* started!\nTap Join to participate, then use /add to log your expenses.`,
-			{ parse_mode: "Markdown", reply_markup: splitKeyboard(splitId, 0) },
-		);
+		await ctx.reply(tr.splitStarted(title), {
+			parse_mode: "Markdown",
+			reply_markup: splitKeyboard(splitId, 0, lang),
+		});
 	});
 
 	// Inline button: join:<splitId>
@@ -53,17 +56,22 @@ export function createBot(env: Env): Bot {
 		const user = ctx.from;
 		const username = user.username ? `@${user.username}` : user.first_name;
 
-		const result = await joinSplit(env.DB, splitId, user.id, username);
+		const [result, split] = await Promise.all([
+			joinSplit(env.DB, splitId, user.id, username),
+			getSplitById(env.DB, splitId),
+		]);
+		const lang = resolveLang(split?.language);
+		const tr = t(lang);
 
 		if (result.meta.changes === 0) {
-			await ctx.answerCallbackQuery({ text: "You've already joined this split.", show_alert: true });
+			await ctx.answerCallbackQuery({ text: tr.alreadyJoined, show_alert: true });
 		} else {
 			const participants = await getParticipants(env.DB, splitId);
 			await ctx.editMessageReplyMarkup({
-				reply_markup: splitKeyboard(splitId, participants.length),
+				reply_markup: splitKeyboard(splitId, participants.length, lang),
 			});
 			await ctx.answerCallbackQuery({
-				text: `You joined the split! Participants: ${participants.map((p) => p.username).join(", ")}`,
+				text: tr.youJoined(participants.map((p) => p.username).join(", ")),
 				show_alert: true,
 			});
 		}
@@ -72,11 +80,15 @@ export function createBot(env: Env): Bot {
 	// Inline button: participants:<splitId>
 	bot.callbackQuery(/^participants:(\d+)$/, async (ctx) => {
 		const splitId = parseInt(ctx.match[1], 10);
-		const participants = await getParticipants(env.DB, splitId);
+		const [split, participants] = await Promise.all([
+			getSplitById(env.DB, splitId),
+			getParticipants(env.DB, splitId),
+		]);
+		const tr = t(resolveLang(split?.language));
 		const text =
 			participants.length === 0
-				? "No participants yet."
-				: `Participants (${participants.length}):\n${participants.map((p) => p.username).join(", ")}`;
+				? tr.noParticipants
+				: tr.participantsList(participants.length, participants.map((p) => p.username).join(", "));
 		await ctx.answerCallbackQuery({ text, show_alert: true });
 	});
 
@@ -89,9 +101,10 @@ export function createBot(env: Env): Bot {
 			getParticipants(env.DB, splitId),
 			getSplitExpenses(env.DB, splitId),
 		]);
+		const tr = t(resolveLang(split?.language));
 
 		if (participants.length === 0) {
-			await ctx.answerCallbackQuery({ text: "Can't finalize — nobody has joined yet.", show_alert: true });
+			await ctx.answerCallbackQuery({ text: tr.cantFinalize, show_alert: true });
 			return;
 		}
 
@@ -99,38 +112,36 @@ export function createBot(env: Env): Bot {
 		await ctx.answerCallbackQuery();
 
 		const title = split?.title ?? "Split";
+		const participantList = participants.map((p) => p.username).join(", ");
 		const total = expenses.reduce((s, e) => s + e.amount, 0);
 		const share = fmt(total / participants.length);
 		const settlements = calculateSettlement(expenses, participants);
 
 		const expenseLines =
 			expenses.length === 0
-				? ["Nobody added any expenses."]
+				? [tr.noExpenses]
 				: expenses.map(
-						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? ` (${e.description})` : ""}`,
+						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? tr.forDesc(e.description) : ""}`,
 					);
 
 		const settlementLines =
 			settlements.length === 0
-				? ["Everyone is even!"]
+				? [tr.everyoneEven]
 				: settlements.map((s) => `• ${s.from} → ${s.to}: ${fmt(s.amount)}`);
 
 		const settlementText = [
-			`*${title} — Final*`,
-			`Participants: ${participants.map((p) => p.username).join(", ")}`,
+			tr.settlementTitle(title),
+			tr.participantsLine(participantList),
 			``,
-			`*Expenses:*`,
+			tr.expensesHeader,
 			...expenseLines,
-			`Total: ${fmt(total)} | Each owes: ${share}`,
+			tr.totalLine(fmt(total), share),
 			``,
-			`*Who pays whom:*`,
+			tr.whoPaysWhom,
 			...settlementLines,
 		].join("\n");
 
-		await ctx.editMessageText(
-			`*${title}* ✅ Finalized\nParticipants: ${participants.map((p) => p.username).join(", ")}`,
-			{ parse_mode: "Markdown" },
-		);
+		await ctx.editMessageText(tr.finalizedShort(title, participantList), { parse_mode: "Markdown" });
 		await ctx.reply(settlementText, { parse_mode: "Markdown" });
 	});
 
@@ -149,11 +160,12 @@ export function createBot(env: Env): Bot {
 
 		const description = args.slice(1).join(" ") || null;
 		const username = user.username ? `@${user.username}` : user.first_name;
+		const tr = t(resolveLang(split.language));
 
 		await addExpense(env.DB, split.id, user.id, username, amount, description);
 
-		const desc = description ? ` for ${description}` : "";
-		await ctx.reply(`${username} added ${fmt(amount)}${desc}.`);
+		const desc = description ? tr.forDesc(description) : "";
+		await ctx.reply(tr.addedExpense(username, fmt(amount), desc));
 	});
 
 	// /status — show participants and expenses so far
@@ -166,17 +178,18 @@ export function createBot(env: Env): Bot {
 			getParticipants(env.DB, split.id),
 			getSplitExpenses(env.DB, split.id),
 		]);
+		const tr = t(resolveLang(split.language));
 
 		const participantLine =
 			participants.length === 0
-				? "No participants yet."
+				? tr.noParticipants
 				: participants.map((p) => p.username).join(", ");
 
 		const expenseLines =
 			expenses.length === 0
-				? ["No expenses yet."]
+				? [tr.noExpensesYet]
 				: expenses.map(
-						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? ` (${e.description})` : ""}`,
+						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? tr.forDesc(e.description) : ""}`,
 					);
 
 		const total = expenses.reduce((s, e) => s + e.amount, 0);
@@ -184,11 +197,11 @@ export function createBot(env: Env): Bot {
 		await ctx.reply(
 			[
 				`*${split.title}*`,
-				`Participants: ${participantLine}`,
+				tr.participantsLine(participantLine),
 				``,
-				`*Expenses:*`,
+				tr.expensesHeader,
 				...expenseLines,
-				...(expenses.length > 0 ? [``, `Total: ${fmt(total)}`] : []),
+				...(expenses.length > 0 ? [``, tr.totalSoFar(fmt(total))] : []),
 			].join("\n"),
 			{ parse_mode: "Markdown" },
 		);
@@ -204,10 +217,10 @@ export function createBot(env: Env): Bot {
 			getParticipants(env.DB, split.id),
 			getSplitExpenses(env.DB, split.id),
 		]);
-
 		if (participants.length === 0) return;
 
 		await finalizeSplit(env.DB, split.id);
+		const tr = t(resolveLang(split.language));
 
 		const total = expenses.reduce((s, e) => s + e.amount, 0);
 		const share = fmt(total / participants.length);
@@ -215,49 +228,41 @@ export function createBot(env: Env): Bot {
 
 		const expenseLines =
 			expenses.length === 0
-				? ["Nobody added any expenses."]
+				? [tr.noExpenses]
 				: expenses.map(
-						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? ` (${e.description})` : ""}`,
+						(e) => `• ${e.username}: ${fmt(e.amount)}${e.description ? tr.forDesc(e.description) : ""}`,
 					);
 
 		const settlementLines =
 			settlements.length === 0
-				? ["Everyone is even!"]
+				? [tr.everyoneEven]
 				: settlements.map((s) => `• ${s.from} → ${s.to}: ${fmt(s.amount)}`);
 
 		await ctx.reply(
 			[
-				`*${split.title} — Final*`,
-				`Participants: ${participants.map((p) => p.username).join(", ")}`,
+				tr.settlementTitle(split.title),
+				tr.participantsLine(participants.map((p) => p.username).join(", ")),
 				``,
-				`*Expenses:*`,
+				tr.expensesHeader,
 				...expenseLines,
-				`Total: ${fmt(total)} | Each owes: ${share}`,
+				tr.totalLine(fmt(total), share),
 				``,
-				`*Who pays whom:*`,
+				tr.whoPaysWhom,
 				...settlementLines,
 			].join("\n"),
 			{ parse_mode: "Markdown" },
 		);
 	});
 
-	bot.command("help", (ctx) =>
-		ctx.reply(
-			[
-				"*Split Money Bot*",
-				``,
-				`/newsplit [title] — start a new split`,
-				`/add <amount> [description] — log an expense (must join first)`,
-				`/status — show current expenses and participants`,
-				`/finalize — calculate and show who pays whom`,
-			].join("\n"),
-			{ parse_mode: "Markdown" },
-		),
-	);
+	bot.command("help", (ctx) => {
+		const tr = t(resolveLang(ctx.from?.language_code));
+		return ctx.reply(tr.help, { parse_mode: "Markdown" });
+	});
 
-	bot.command("start", (ctx) =>
-		ctx.reply("Add me to a group and use /newsplit to start splitting expenses."),
-	);
+	bot.command("start", (ctx) => {
+		const tr = t(resolveLang(ctx.from?.language_code));
+		return ctx.reply(tr.start);
+	});
 
 	return bot;
 }

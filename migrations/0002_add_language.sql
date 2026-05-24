@@ -1,0 +1,1 @@
+ALTER TABLE splits ADD COLUMN language TEXT NOT NULL DEFAULT 'en';

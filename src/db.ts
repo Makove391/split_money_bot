@@ -5,6 +5,7 @@ export interface Split {
 	group_id: string;
 	title: string;
 	status: SplitStatus;
+	language: string;
 	created_at: number;
 }
 
@@ -50,10 +51,15 @@ export function getActiveSplit(db: D1Database, groupId: string): Promise<Split |
 		.first<Split>();
 }
 
-export async function createSplit(db: D1Database, groupId: string, title: string): Promise<number> {
+export async function createSplit(
+	db: D1Database,
+	groupId: string,
+	title: string,
+	language: string,
+): Promise<number> {
 	const result = await db
-		.prepare("INSERT INTO splits (group_id, title) VALUES (?, ?) RETURNING id")
-		.bind(groupId, title)
+		.prepare("INSERT INTO splits (group_id, title, language) VALUES (?, ?, ?) RETURNING id")
+		.bind(groupId, title, language)
 		.first<{ id: number }>();
 	return result!.id;
 }
