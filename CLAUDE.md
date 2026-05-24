@@ -2,6 +2,30 @@
 
 This file gives Claude Code the context it needs to work effectively on this repository.
 
+## Current Implementation State
+
+The bot is fully implemented and deployed. Read this before making changes:
+
+- **D1 binding name:** `DB` in both `wrangler.jsonc` and `src/env.d.ts`. Do not rename.
+- **Deploy:** `npm run deploy` (wraps `wrangler deploy`). Webhook is already registered.
+- **Migration:** `0001_initial.sql` applied to remote D1. Tables: `splits`, `split_participants`, `expenses`.
+- **Telegram commands registered** via `setMyCommands`: newsplit, add, status, finalize, help.
+
+### UX decisions (intentional — do not revert)
+- Command errors are **silent** (no reply). Bot is not a group admin, so no delete either.
+- Join confirmation is a **private popup** (`answerCallbackQuery` with `show_alert: true`) — no public "X joined" message.
+- Participants list is a **private popup**.
+- `/add` success and `/status`/`/finalize` results post **publicly** to the group.
+
+### Inline keyboard on every split message
+Three buttons: `Join` / `Join (N)`, `👥 Participants`, `✅ Finalize`.
+All three are handled via `bot.callbackQuery(...)` in `src/bot.ts`.
+
+### Next task
+In the `finalize:` callback handler (`src/bot.ts`), replace the `ctx.editMessageReplyMarkup` + `ctx.reply` calls with a single `ctx.editMessageText(...)` call so the original split message is updated in place with the settlement info instead of posting a new reply.
+
+---
+
 ## Project Overview
 
 A Telegram bot with simple request/response logic and a small database. Hosted entirely on Cloudflare's free tier.

@@ -321,9 +321,9 @@ export function createBot(env: Env): Bot {
 	return bot;
 }
 
-const PAGE_SIZE = 5;
+export const PAGE_SIZE = 5;
 
-function buildHistoryText(
+export function buildHistoryText(
 	splits: SplitSummary[],
 	offset: number,
 	total: number,
@@ -338,20 +338,24 @@ function buildHistoryText(
 	return [tr.historyTitle, "", ...lines, "", tr.historyPage(currentPage, pages)].join("\n");
 }
 
-function buildHistoryKeyboard(
+export function buildHistoryKeyboard(
 	splits: SplitSummary[],
 	offset: number,
 	total: number,
 	lang: Lang,
 ): InlineKeyboard {
 	const kb = new InlineKeyboard();
-	for (const s of splits) {
-		kb.text(s.title, `settlement:${s.id}`).row();
+	for (let i = 0; i < splits.length; i++) {
+		kb.text(splits[i].title, `settlement:${splits[i].id}`);
+		if (i < splits.length - 1) kb.row();
 	}
 	const hasPrev = offset > 0;
 	const hasNext = offset + PAGE_SIZE < total;
-	if (hasPrev) kb.text(t(lang).historyPrevBtn, `history:${offset - PAGE_SIZE}:${lang}`);
-	if (hasNext) kb.text(t(lang).historyNextBtn, `history:${offset + PAGE_SIZE}:${lang}`);
+	if (hasPrev || hasNext) {
+		kb.row();
+		if (hasPrev) kb.text(t(lang).historyPrevBtn, `history:${offset - PAGE_SIZE}:${lang}`);
+		if (hasNext) kb.text(t(lang).historyNextBtn, `history:${offset + PAGE_SIZE}:${lang}`);
+	}
 	return kb;
 }
 

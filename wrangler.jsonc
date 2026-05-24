@@ -18,8 +18,7 @@
 		{
 			"binding": "DB",
 			"database_name": "split-money-bot-db",
-			"database_id": "caeceb66-c492-4f2d-af77-fbec29313f5d",
-			"remote": true
+			"database_id": "caeceb66-c492-4f2d-af77-fbec29313f5d"
 		}
 	]
 	/**

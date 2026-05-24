@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { calculateSettlement } from "../src/db";
-import type { Expense, SplitParticipant } from "../src/db";
+import { calculateSettlement, getFinalizedSplits, countFinalizedSplits } from "../src/db";
+import type { Expense, SplitParticipant, SplitSummary } from "../src/db";
+
+function mockDb(firstResult: unknown = null, allResults: unknown[] = []): D1Database {
+	const stmt: any = {
+		bind: (..._args: unknown[]) => stmt,
+		first: async () => firstResult,
+		all: async () => ({ results: allResults }),
+		run: async () => ({ meta: { changes: 1 }, success: true }),
+	};
+	return { prepare: (_sql: string) => stmt } as unknown as D1Database;
+}
 
 function makeParticipant(userId: number, username: string): SplitParticipant {
 	return { split_id: 1, user_id: userId, username, joined_at: 0 };
@@ -47,5 +57,33 @@ describe("calculateSettlement", () => {
 		const result = calculateSettlement(expenses, participants);
 		expect(result).toContainEqual({ from: "Carol", to: "Alice", amount: 20 });
 		expect(result).toContainEqual({ from: "Carol", to: "Bob", amount: 20 });
+	});
+});
+
+describe("getFinalizedSplits", () => {
+	it("returns splits from db", async () => {
+		const splits: SplitSummary[] = [
+			{ id: 1, title: "Beach trip", language: "en", participant_count: 3, total: 90 },
+			{ id: 2, title: "Dinner", language: "uk", participant_count: 2, total: 40 },
+		];
+		const result = await getFinalizedSplits(mockDb(null, splits), "group1", 5, 0);
+		expect(result).toEqual(splits);
+	});
+
+	it("returns empty array when there are no finalized splits", async () => {
+		const result = await getFinalizedSplits(mockDb(null, []), "group1", 5, 0);
+		expect(result).toEqual([]);
+	});
+});
+
+describe("countFinalizedSplits", () => {
+	it("returns the count from db", async () => {
+		const result = await countFinalizedSplits(mockDb({ count: 7 }), "group1");
+		expect(result).toBe(7);
+	});
+
+	it("returns 0 when db returns null", async () => {
+		const result = await countFinalizedSplits(mockDb(null), "group1");
+		expect(result).toBe(0);
 	});
 });

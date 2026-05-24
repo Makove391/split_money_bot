@@ -50,7 +50,7 @@ const en: Tr = {
 	splitStarted: (title) =>
 		`*${title}* started!\nTap Join to participate, then use /add to log your expenses.`,
 	alreadyJoined: "You've already joined this split.",
-	youJoined: (list) => `You joined the split! Participants: ${list}`,
+	youJoined: (list) => `You joined! Use /add <amount> to log expenses.\n👥 ${list}`,
 	noParticipants: "No participants yet.",
 	participantsList: (count, list) => `Participants (${count}):\n${list}`,
 	cantFinalize: "Can't finalize — nobody has joined yet.",
@@ -93,7 +93,7 @@ const uk: Tr = {
 	splitStarted: (title) =>
 		`*${title}* розпочато!\nНатисни Приєднатися щоб взяти участь, потім /add щоб додати витрати.`,
 	alreadyJoined: "Ти вже приєднався до цього розподілу.",
-	youJoined: (list) => `Ти приєднався! Учасники: ${list}`,
+	youJoined: (list) => `Приєднався! Введи /add <сума> щоб додати витрату.\n👥 ${list}`,
 	noParticipants: "Поки немає учасників.",
 	participantsList: (count, list) => `Учасники (${count}):\n${list}`,
 	cantFinalize: "Неможливо завершити — ніхто ще не приєднався.",
@@ -136,7 +136,7 @@ const pl: Tr = {
 	splitStarted: (title) =>
 		`*${title}* rozpoczęty!\nNaciśnij Dołącz, aby uczestniczyć, potem użyj /add do dodawania wydatków.`,
 	alreadyJoined: "Już dołączyłeś do tego podziału.",
-	youJoined: (list) => `Dołączyłeś! Uczestnicy: ${list}`,
+	youJoined: (list) => `Dołączyłeś! Użyj /add <kwota> by dodać wydatek.\n👥 ${list}`,
 	noParticipants: "Brak uczestników.",
 	participantsList: (count, list) => `Uczestnicy (${count}):\n${list}`,
 	cantFinalize: "Nie można zakończyć — nikt jeszcze nie dołączył.",
