@@ -36,6 +36,46 @@ export function getSplitById(db: D1Database, splitId: number): Promise<Split | n
 	return db.prepare("SELECT * FROM splits WHERE id = ?").bind(splitId).first<Split>();
 }
 
+export interface SplitSummary {
+	id: number;
+	title: string;
+	language: string;
+	participant_count: number;
+	total: number;
+}
+
+export async function getFinalizedSplits(
+	db: D1Database,
+	groupId: string,
+	limit: number,
+	offset: number,
+): Promise<SplitSummary[]> {
+	const result = await db
+		.prepare(
+			`SELECT s.id, s.title, s.language,
+			  COUNT(DISTINCT sp.user_id) AS participant_count,
+			  COALESCE(SUM(e.amount), 0) AS total
+			 FROM splits s
+			 LEFT JOIN split_participants sp ON sp.split_id = s.id
+			 LEFT JOIN expenses e ON e.split_id = s.id
+			 WHERE s.group_id = ? AND s.status = 'finalized'
+			 GROUP BY s.id
+			 ORDER BY s.created_at DESC
+			 LIMIT ? OFFSET ?`,
+		)
+		.bind(groupId, limit, offset)
+		.all<SplitSummary>();
+	return result.results;
+}
+
+export async function countFinalizedSplits(db: D1Database, groupId: string): Promise<number> {
+	const result = await db
+		.prepare("SELECT COUNT(*) AS count FROM splits WHERE group_id = ? AND status = 'finalized'")
+		.bind(groupId)
+		.first<{ count: number }>();
+	return result?.count ?? 0;
+}
+
 export async function countSplitsOnDate(db: D1Database, groupId: string, date: string): Promise<number> {
 	const result = await db
 		.prepare("SELECT COUNT(*) as count FROM splits WHERE group_id = ? AND date(created_at, 'unixepoch') = ?")

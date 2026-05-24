@@ -3,6 +3,8 @@ import {
 	getActiveSplit,
 	getSplitById,
 	countSplitsOnDate,
+	getFinalizedSplits,
+	countFinalizedSplits,
 	createSplit,
 	joinSplit,
 	isParticipant,
@@ -12,6 +14,7 @@ import {
 	finalizeSplit,
 	calculateSettlement,
 } from "./db";
+import type { SplitSummary } from "./db";
 import { resolveLang, t } from "./i18n";
 import type { Lang } from "./i18n";
 
@@ -145,6 +148,43 @@ export function createBot(env: Env): Bot {
 		await ctx.reply(settlementText, { parse_mode: "Markdown" });
 	});
 
+	// Inline button: history:<offset>:<lang> — paginate history in-place
+	bot.callbackQuery(/^history:(\d+):([a-z]+)$/, async (ctx) => {
+		const offset = parseInt(ctx.match[1], 10);
+		const lang = resolveLang(ctx.match[2]);
+		const groupId = String(ctx.chat!.id);
+		const [splits, total] = await Promise.all([
+			getFinalizedSplits(env.DB, groupId, PAGE_SIZE, offset),
+			countFinalizedSplits(env.DB, groupId),
+		]);
+		await ctx.editMessageText(buildHistoryText(splits, offset, total, t(lang)), {
+			parse_mode: "Markdown",
+			reply_markup: buildHistoryKeyboard(splits, offset, total, lang),
+		});
+		await ctx.answerCallbackQuery();
+	});
+
+	// Inline button: settlement:<splitId> — popup with who-pays-whom
+	bot.callbackQuery(/^settlement:(\d+)$/, async (ctx) => {
+		const splitId = parseInt(ctx.match[1], 10);
+		const [split, participants, expenses] = await Promise.all([
+			getSplitById(env.DB, splitId),
+			getParticipants(env.DB, splitId),
+			getSplitExpenses(env.DB, splitId),
+		]);
+		const tr = t(resolveLang(split?.language));
+		const settlements = calculateSettlement(expenses, participants);
+		const lines =
+			settlements.length === 0
+				? [tr.everyoneEven]
+				: settlements.map((s) => `${s.from} → ${s.to}: ${fmt(s.amount)}`);
+		const full = [split?.title ?? "", "", ...lines].join("\n");
+		await ctx.answerCallbackQuery({
+			text: full.length > 200 ? full.slice(0, 197) + "…" : full,
+			show_alert: true,
+		});
+	});
+
 	// /add <amount> [description]
 	bot.command("add", async (ctx) => {
 		const groupId = String(ctx.chat.id);
@@ -254,6 +294,20 @@ export function createBot(env: Env): Bot {
 		);
 	});
 
+	// /history — browse past finalized splits
+	bot.command("history", async (ctx) => {
+		const groupId = String(ctx.chat.id);
+		const lang = resolveLang(ctx.from?.language_code);
+		const [splits, total] = await Promise.all([
+			getFinalizedSplits(env.DB, groupId, PAGE_SIZE, 0),
+			countFinalizedSplits(env.DB, groupId),
+		]);
+		await ctx.reply(buildHistoryText(splits, 0, total, t(lang)), {
+			parse_mode: "Markdown",
+			reply_markup: buildHistoryKeyboard(splits, 0, total, lang),
+		});
+	});
+
 	bot.command("help", (ctx) => {
 		const tr = t(resolveLang(ctx.from?.language_code));
 		return ctx.reply(tr.help, { parse_mode: "Markdown" });
@@ -265,6 +319,40 @@ export function createBot(env: Env): Bot {
 	});
 
 	return bot;
+}
+
+const PAGE_SIZE = 5;
+
+function buildHistoryText(
+	splits: SplitSummary[],
+	offset: number,
+	total: number,
+	tr: ReturnType<typeof t>,
+): string {
+	if (total === 0) return tr.historyEmpty;
+	const pages = Math.ceil(total / PAGE_SIZE);
+	const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+	const lines = splits.map((s, i) =>
+		tr.historyItem(offset + i + 1, s.title, fmt(s.total), s.participant_count),
+	);
+	return [tr.historyTitle, "", ...lines, "", tr.historyPage(currentPage, pages)].join("\n");
+}
+
+function buildHistoryKeyboard(
+	splits: SplitSummary[],
+	offset: number,
+	total: number,
+	lang: Lang,
+): InlineKeyboard {
+	const kb = new InlineKeyboard();
+	for (const s of splits) {
+		kb.text(s.title, `settlement:${s.id}`).row();
+	}
+	const hasPrev = offset > 0;
+	const hasNext = offset + PAGE_SIZE < total;
+	if (hasPrev) kb.text(t(lang).historyPrevBtn, `history:${offset - PAGE_SIZE}:${lang}`);
+	if (hasNext) kb.text(t(lang).historyNextBtn, `history:${offset + PAGE_SIZE}:${lang}`);
+	return kb;
 }
 
 function fmt(amount: number): string {

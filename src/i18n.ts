@@ -31,6 +31,12 @@ type Tr = {
 	forDesc: (desc: string) => string;
 	noExpensesYet: string;
 	totalSoFar: (total: string) => string;
+	historyTitle: string;
+	historyEmpty: string;
+	historyItem: (n: number, title: string, total: string, count: number) => string;
+	historyPage: (current: number, total: number) => string;
+	historyPrevBtn: string;
+	historyNextBtn: string;
 	help: string;
 	start: string;
 };
@@ -60,6 +66,12 @@ const en: Tr = {
 	forDesc: (desc) => ` for ${desc}`,
 	noExpensesYet: "No expenses yet.",
 	totalSoFar: (total) => `Total: ${total}`,
+	historyTitle: "*Past splits:*",
+	historyEmpty: "No finalized splits yet.",
+	historyItem: (n, title, total, count) => `${n}. ${title} — ${total} (${count})`,
+	historyPage: (current, total) => `Page ${current} of ${total}`,
+	historyPrevBtn: "← Previous",
+	historyNextBtn: "Next →",
 	help: [
 		"*Split Money Bot*",
 		"",
@@ -67,6 +79,7 @@ const en: Tr = {
 		"/add <amount> [description] — log an expense (must join first)",
 		"/status — show current expenses and participants",
 		"/finalize — calculate and show who pays whom",
+		"/history — browse past splits",
 	].join("\n"),
 	start: "Add me to a group and use /newsplit to start splitting expenses.",
 };
@@ -96,6 +109,12 @@ const uk: Tr = {
 	forDesc: (desc) => ` за ${desc}`,
 	noExpensesYet: "Витрат поки немає.",
 	totalSoFar: (total) => `Разом: ${total}`,
+	historyTitle: "*Минулі розподіли:*",
+	historyEmpty: "Завершених розподілів ще немає.",
+	historyItem: (n, title, total, count) => `${n}. ${title} — ${total} (${count})`,
+	historyPage: (current, total) => `Сторінка ${current} з ${total}`,
+	historyPrevBtn: "← Назад",
+	historyNextBtn: "Далі →",
 	help: [
 		"*Split Money Bot*",
 		"",
@@ -103,6 +122,7 @@ const uk: Tr = {
 		"/add <сума> [опис] — додати витрату (спочатку приєднайся)",
 		"/status — показати поточні витрати та учасників",
 		"/finalize — підрахувати та показати хто кому платить",
+		"/history — переглянути минулі розподіли",
 	].join("\n"),
 	start: "Додай мене до групи і використовуй /newsplit щоб почати ділити витрати.",
 };
@@ -132,6 +152,12 @@ const pl: Tr = {
 	forDesc: (desc) => ` za ${desc}`,
 	noExpensesYet: "Brak wydatków.",
 	totalSoFar: (total) => `Razem: ${total}`,
+	historyTitle: "*Poprzednie podziały:*",
+	historyEmpty: "Brak zakończonych podziałów.",
+	historyItem: (n, title, total, count) => `${n}. ${title} — ${total} (${count})`,
+	historyPage: (current, total) => `Strona ${current} z ${total}`,
+	historyPrevBtn: "← Poprzednia",
+	historyNextBtn: "Następna →",
 	help: [
 		"*Split Money Bot*",
 		"",
@@ -139,6 +165,7 @@ const pl: Tr = {
 		"/add <kwota> [opis] — dodaj wydatek (najpierw dołącz)",
 		"/status — pokaż aktualne wydatki i uczestników",
 		"/finalize — oblicz i pokaż kto komu płaci",
+		"/history — przeglądaj poprzednie podziały",
 	].join("\n"),
 	start: "Dodaj mnie do grupy i użyj /newsplit, aby zacząć dzielić wydatki.",
 };
